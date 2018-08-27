@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title></title>
+	<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+	<link href="https://cdn.bootcss.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+	<style>
+		.checkbox{
+			cursor:pointer;
+		}
+		.done{
+			text-decoration:line-through !important;
+			color: #ccc;
+		}
+		[v-cloak]{
+			display: none;
+		}
+	</style>
+	<script src="./hammer.js"></script>
+</head>
+<body>
+	<div id='app' v-cloak>
+		<nav class="navbar navbar-inverse">
+		  <div class="container">
+		    <div class="navbar-header">
+		      <a class="navbar-brand" href="#/all">
+		      	{{formatDate}}
+		      </a>
+		    </div>
+		  </div>
+		</nav>
+		<div class="container">
+			<div class="row">
+				<div class="col-xs-12">
+					<div class="panel panel-default">
+						<div class="panel-body">
+						    <h3 class="text-primary">哥们，还有<span class="text-danger">{{count}}</span>件事没干呢！</h3>
+						</div>
+						<div class="panel-footer">
+							<div class="input-group">
+							    <input 
+							    	type="text" 
+							    	class="form-control" 
+							    	placeholder="输入待做的事情..."
+									v-model='msg'
+									@keyup.enter='add'
+							    >
+							    <span class="input-group-btn">
+							        <button class="btn btn-default" type="button" @click='add'>添加</button>
+							    </span>
+						    </div>
+						</div>
+					</div>	
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-xs-12">
+					<div class="panel panel-default">
+						<div class="list-group">
+						 	<li 
+						 		class="list-group-item" 
+						 		v-for='(todo,i) in todoList' 
+						 		@dblclick='change(todo)'
+						 		ref='li'
+						 	>
+	                            <div class="checkbox" v-show='current!==todo'>
+	                        	    <button class="btn close btn-sm" @click='remove(i)'>&times;</button>
+	                                <label :class="{done:todo.status}">
+	                                    <input type="checkbox" v-model='todo.status'>{{todo.msg}}
+	                                </label>
+	                            </div>
+	                            <input 
+	                            	class="form-control" 
+	                            	type="text" 
+	                            	v-model='todo.msg'
+									v-show='current===todo'
+									@blur='cancel'
+									@keyup.enter='cancel'
+									v-focus='current===todo'
+	                            >
+	                        </li>
+						</div>
+					</div>		
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-xs-12">
+					<div class="panel-footer">
+						<ul class="nav nav-pills">
+	                        <li :class="{active:hash==='/all'}"><a href="#/all">全部任务</a></li>
+	                        <li :class="{active:hash==='/unfinish'}"><a href="#/unfinish">未完成</a></li>
+	                        <li :class="{active:hash==='/finish'}"><a href="#/finish">已完成</a></li>
+	                    </ul>
+					</div>	
+				</div>
+			</div>
+		</div>
+	</div>
+	<script src="https://cdn.bootcss.com/vue/2.5.16/vue.min.js"></script>
+	<script type="text/javascript">
+		var vm=new Vue({
+			created(){
+				this.task()
+				this.init()
+				this.touch={}
+			},
+			mounted(){
+				this.bindDblTap()
+			},
+			el:'#app',
+			data:{
+				list:[],
+				msg:'',
+				current:{},
+				hash:'',
+				time:'',
+				dateNow:0,
+				timer:null
+			},
+			methods:{
+				init(){
+					this.list=JSON.parse(window.localStorage.getItem('data')) || []
+					this.hash=window.location.hash.substr(1) || '/all'
+					window.addEventListener('hashchange',()=>{
+						this.hash=window.location.hash.substr(1) || '/all'
+					})
+					this.timer=setInterval(()=>{
+						this.task()
+					},1000)
+				},
+				bindDblTap(){
+					var self=this
+					const lis = this.$refs.li
+					lis.forEach((li,index)=>{
+						const hammertime = new Hammer(li);
+						hammertime.on('doubletap', function(ev) {
+						   self.change(self.todoList[index]);
+						});	
+					})
+				},
+				task(){
+					this.dateNow=new Date()
+				},
+				add(){
+					if(this.msg===''){
+						return 
+					}
+					var obj={}
+					obj.msg=this.msg+this.getCurrentTime()
+					obj.status=false
+					this.list.push(obj)
+					this.msg=''
+				},
+				remove(i){
+					this.list=this.list.filter((val,index)=>index!==i)
+				},
+				change(todo){
+					this.current=todo
+				},
+				cancel(){
+					this.current={}
+				},
+				getCurrentTime(){
+					var date=new Date()
+					var years=date.getFullYear()
+					var months=date.getMonth()+1
+					var days=date.getDate()
+					return this.time=' ('+years+'年'+months+'月'+days+'日)'
+				},
+			},
+			watch:{
+				list:{
+					handler(){
+						window.localStorage.setItem('data',JSON.stringify(this.list))
+						this.bindDblTap()
+					},
+					deep:true
+				}
+			},
+			directives:{
+				focus(el,binding){
+					if(binding.value){
+						el.focus()
+					}
+				}
+			},
+			computed:{
+				todoList(){
+					if (this.hash === '/all') {
+		                return this.list;
+		            } else if (this.hash === '/finish') {
+		                return this.list.filter(item => {
+		                    return item.status === true;
+		                });
+		            } else if (this.hash === '/unfinish') {
+		                return this.list.filter(item => {
+		                    return item.status === false;
+		                });
+		            }
+				},
+				count(){
+					return this.list.filter(item=>item.status===false).length
+				},
+				formatDate(){
+					var date=new Date(this.dateNow)
+					var years=date.getFullYear()
+					var months=date.getMonth()+1
+					var days=date.getDate()
+					var hours=date.getHours()
+					var minutes=date.getMinutes()
+					var seconds=date.getSeconds()
+					hours=hours<10?'0'+hours:hours
+					minutes=minutes<10?'0'+minutes:minutes
+					seconds=seconds<'10'?'0'+seconds:seconds
+					return years+'年'+months+'月'+days+'日'+hours+':'+minutes+':'+seconds
+				}
+			},
+			beforeDestroy(){
+				if(this.timer){
+					clearInterval(this.timer)
+				}	
+			}
+		})
+	</script>
+</body>
+</html>
